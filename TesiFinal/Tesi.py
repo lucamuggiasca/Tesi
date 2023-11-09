@@ -1,13 +1,14 @@
 import pandas as pd
 import yfinance as yf
 import numpy as np
+import Sentiment
 import technical_indicators_lib as til
 from sklearn.ensemble import AdaBoostRegressor
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.model_selection import cross_val_score
 import matplotlib.pyplot as plt
 from datetime import datetime,timedelta,timezone
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error, mean_squared_log_error, median_absolute_error, explained_variance_score
 
 #Definisco il Normalizzatore
 class Normalizer():
@@ -73,36 +74,57 @@ def apply_rolling_mean(data, column, window_size):
     data = data.dropna()  # Rimuovi i valori mancanti generati dalla media mobile
     return data
 
+
+sentiment = 0
+initial_price_plot = 0
+
 # Carica i dati tramite api yfinance
 TITMI = yf.Ticker("TIT.MI")
 data= TITMI.history(period="1Y",actions=False) 
+data_sent=data
+
+#Sentiment
+if sentiment == 1:
+    print(data_sent.index[0])
+    print(data_sent.index[-1])
+    SA = Sentiment.Sentiment_Analysis(query="Telecom", language='it' ,country='IT', start=data_sent.index[0], end=data_sent.index[-1])
+    polarity_array = np.array('')
+    for idx in data_sent.index:
+        print(idx)
+        polarity_array = np.append(polarity_array, SA.do_Analysis(idx, debug=True))    
+    
+    data['polarity'] = polarity_array[:-1] # probabilmente va anche fatto un flip
+    plt.plot(polarity_array)
+    plt.show()
+
+#Reset dell'indice
 data.reset_index(inplace=True)
 
-#data = data.drop(data.index[-3:-1])
 # Converti le colonne da stringa a float
 data['Date'] = timestamps_to_floats(data['Date']) 
 
-
 #Real close prices plot
-dates = data['Date']
-first_date = dates.iloc[0]
-last_date= dates.iloc[-1]
-num_ticks = 5
-date_intervals = (last_date - first_date) / num_ticks
-x_ticks = [first_date + i * date_intervals for i in range(num_ticks)]
-x_ticks.append(last_date)
-x_labels = [datetime.utcfromtimestamp(ts).strftime('%Y-%m-%d') for ts in x_ticks] 
-x_labels[0] = (datetime.utcfromtimestamp(x_ticks[0]) + timedelta(days=1)).strftime('%Y-%m-%d')
-x_labels[5] = (datetime.utcfromtimestamp(x_ticks[5]) + timedelta(days=1)).strftime('%Y-%m-%d')
-plt.figure(figsize=(12, 6))
-plt.plot(dates, data['Close'], color='blue', linewidth=2, label='Close prices from 2022-10-13 to 2023-10-12')
-plt.title('Actual close prices')
-plt.xlabel('Data')
-plt.ylabel('Valore di chiusura nel mercato (€)')
-plt.xticks(x_ticks, x_labels)  # Imposta le ticks dell'asse x
-plt.legend(loc='upper left', fontsize='small')
-plt.grid(True)
-plt.show()
+if initial_price_plot == 1:
+    dates = data['Date']
+    first_date = dates.iloc[0]
+    last_date= dates.iloc[-1]
+    num_ticks = 5
+    date_intervals = (last_date - first_date) / num_ticks
+    x_ticks = [first_date + i * date_intervals for i in range(num_ticks)]
+    x_ticks.append(last_date)
+    x_labels = [datetime.utcfromtimestamp(ts).strftime('%Y-%m-%d') for ts in x_ticks] 
+    x_labels[0] = (datetime.utcfromtimestamp(x_ticks[0]) + timedelta(days=1)).strftime('%Y-%m-%d')
+    x_labels[5] = (datetime.utcfromtimestamp(x_ticks[5]) + timedelta(days=1)).strftime('%Y-%m-%d')
+    plt.figure(figsize=(12, 6))
+    plt.plot(dates, data['Close'], color='blue', linewidth=2, label='Close prices from 2022-10-13 to 2023-10-12')
+    plt.title('Actual close prices')
+    plt.xlabel('Data')
+    plt.ylabel('Valore di chiusura nel mercato (€)')
+    plt.xticks(x_ticks, x_labels)  # Imposta le ticks dell'asse x
+    plt.legend(loc='upper left', fontsize='small')
+    plt.grid(True)
+    plt.show()
+
 
 #Applico smoothing ai prezzi di chiusura
 data = apply_rolling_mean(data, 'Close', 5)
@@ -111,7 +133,6 @@ data = apply_rolling_mean(data, 'Close', 5)
 data = data.rename(columns={"Open": "open", "High": "high", "Low":"low", "Close": "close", "Volume": "volume"}) 
 
 #Indicatori
-
 data = til.SMA().get_value_df(data, 7)
 data = data.rename(columns={'SMA':'SMA7'})
 data = til.SMA().get_value_df(data, 14)
@@ -131,7 +152,7 @@ data = til.MACD().get_value_df(data)
 percorso_file_csv = r"C:\\Users\\lucam\\OneDrive\\Desktop\\test.csv"
 data.to_csv(percorso_file_csv, index=False)
 
-#ALL_POSSIBLE_FEATURES:'open','high','low','close','volume','SMA7','SMA14','EMA7','EMA14','RSI','CCI','MACD','stoc_k','stoc_d','MACD_signal_line'
+#ALL_POSSIBLE_FEATURES:'open','high','low','close','volume','SMA7','SMA14','EMA7','EMA14','RSI','CCI','MACD','stoc_k','stoc_d','MACD_signal_line,'polarity'
 
 #Features impostate per il training
 train_test_nextpred_features=['open','high','low','close','volume']
@@ -179,19 +200,33 @@ ada.fit(X_train, Y_train)
 Y_pred_train = ada.predict(X_train)
 Y_pred_test = ada.predict(X_test)
 
-#CV impl
+#Metriche di valutazione
+
+#Calcolo Cross Validation
 scores = cross_val_score(ada, X_train, Y_train, cv=5, scoring='neg_mean_squared_error')
 mean_mse_train = -scores.mean()
 scores = cross_val_score(ada, X_test, Y_test, cv=5, scoring='neg_mean_squared_error')
 mean_mse_test = -scores.mean()
-
-#Calcola MSE e R2 per ogni set
-print("MSE train: %f" % mean_squared_error(Y_train, Y_pred_train))
-print("MSE test: %f" % mean_squared_error(Y_test, Y_pred_test))
-print("R2 train: %f" % r2_score(Y_train, Y_pred_train))
-print("R2 test: %f" % r2_score(Y_test, Y_pred_test))
 print ("CV MSE train: ", mean_mse_train)
 print ("CV MSE test: ", mean_mse_test)
+#Calcolo MSE
+print("MSE train: %f" % mean_squared_error(Y_train, Y_pred_train))
+print("MSE test: %f" % mean_squared_error(Y_test, Y_pred_test))
+#Calcolo R2
+print("R2 train: %f" % r2_score(Y_train, Y_pred_train))
+print("R2 test: %f" % r2_score(Y_test, Y_pred_test))
+#Calcolo MAE
+print("MAE train: %f" % mean_absolute_error(Y_train, Y_pred_train))
+print("MAE test: %f" % mean_absolute_error(Y_test, Y_pred_test))
+#Calcolo MSLE
+print("MSLE train: %f" % mean_squared_log_error(Y_train, Y_pred_train))
+print("MSLE test: %f" % mean_squared_log_error(Y_test, Y_pred_test))
+#Calcolo MedAE
+print("MSLE train: %f" % median_absolute_error(Y_train, Y_pred_train))
+print("MSLE test: %f" % median_absolute_error(Y_test, Y_pred_test))
+#Calcolo Explained Variance Score
+print("MSLE train: %f" % explained_variance_score(Y_train, Y_pred_train))
+print("MSLE test: %f" % explained_variance_score(Y_test, Y_pred_test))
 
 # Estrai le date dalle colonne
 dates_train = train_data['Date'].values

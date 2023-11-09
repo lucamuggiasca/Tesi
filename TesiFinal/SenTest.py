@@ -6,7 +6,7 @@ import numpy as np
 # Carica i dati tramite api yfinance
 TITMI = yf.Ticker("TIT.MI")
 data= TITMI.history(period="1Y",actions=False) 
-data.reset_index(inplace=True)
+#data.reset_index(inplace=True)
 
 #Sentiment
 print(data.index[0])
