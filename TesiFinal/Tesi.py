@@ -222,11 +222,11 @@ print("MAE test: %f" % mean_absolute_error(Y_test, Y_pred_test))
 print("MSLE train: %f" % mean_squared_log_error(Y_train, Y_pred_train))
 print("MSLE test: %f" % mean_squared_log_error(Y_test, Y_pred_test))
 #Calcolo MedAE
-print("MSLE train: %f" % median_absolute_error(Y_train, Y_pred_train))
-print("MSLE test: %f" % median_absolute_error(Y_test, Y_pred_test))
+print("MedAE train: %f" % median_absolute_error(Y_train, Y_pred_train))
+print("MedAE test: %f" % median_absolute_error(Y_test, Y_pred_test))
 #Calcolo Explained Variance Score
-print("MSLE train: %f" % explained_variance_score(Y_train, Y_pred_train))
-print("MSLE test: %f" % explained_variance_score(Y_test, Y_pred_test))
+print("EVS train: %f" % explained_variance_score(Y_train, Y_pred_train))
+print("EVS test: %f" % explained_variance_score(Y_test, Y_pred_test))
 
 # Estrai le date dalle colonne
 dates_train = train_data['Date'].values
