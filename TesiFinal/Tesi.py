@@ -8,7 +8,7 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.model_selection import cross_val_score
 import matplotlib.pyplot as plt
 from datetime import datetime,timedelta,timezone
-from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error, mean_squared_log_error, median_absolute_error, explained_variance_score
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error,mean_absolute_percentage_error, mean_squared_log_error, median_absolute_error, explained_variance_score
 
 #Definisco il Normalizzatore
 class Normalizer():
@@ -218,6 +218,9 @@ print("R2 test: %f" % r2_score(Y_test, Y_pred_test))
 #Calcolo MAE
 print("MAE train: %f" % mean_absolute_error(Y_train, Y_pred_train))
 print("MAE test: %f" % mean_absolute_error(Y_test, Y_pred_test))
+#Calcolo MAPE
+print("MAPE train: %f" % (mean_absolute_percentage_error(Y_train, Y_pred_train)*100))
+print("MAPE test: %f" % (mean_absolute_percentage_error(Y_test, Y_pred_test)*100))
 #Calcolo MSLE
 print("MSLE train: %f" % mean_squared_log_error(Y_train, Y_pred_train))
 print("MSLE test: %f" % mean_squared_log_error(Y_test, Y_pred_test))
