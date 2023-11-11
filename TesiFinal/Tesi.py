@@ -148,6 +148,7 @@ data = til.CCI().get_value_df(data, 14)
 #data = til.ADI().get_value_df(data) inutilizzabile per problema libreria
 data = til.StochasticKAndD().get_value_df(data, 14)
 data = til.MACD().get_value_df(data)
+data = til.ATR().get_value_df(data)
 
 percorso_file_csv = r"C:\\Users\\lucam\\OneDrive\\Desktop\\test.csv"
 data.to_csv(percorso_file_csv, index=False)
@@ -230,6 +231,11 @@ print("MedAE test: %f" % median_absolute_error(Y_test, Y_pred_test))
 #Calcolo Explained Variance Score
 print("EVS train: %f" % explained_variance_score(Y_train, Y_pred_train))
 print("EVS test: %f" % explained_variance_score(Y_test, Y_pred_test))
+#Adjusted R2
+R2adj_train = 1 - (1-ada.score(X_train, Y_train))*(len(Y_train)-1)/(len(Y_train)-X_train.shape[1]-1)
+R2adj_test = 1 - (1-ada.score(X_test, Y_test))*(len(Y_test)-1)/(len(Y_test)-X_test.shape[1]-1)
+print("R2adj train: ",R2adj_train)
+print("R2adj test: ",R2adj_test)
 
 # Estrai le date dalle colonne
 dates_train = train_data['Date'].values
