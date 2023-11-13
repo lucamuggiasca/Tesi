@@ -153,7 +153,7 @@ data = til.ATR().get_value_df(data)
 percorso_file_csv = r"C:\\Users\\lucam\\OneDrive\\Desktop\\test.csv"
 data.to_csv(percorso_file_csv, index=False)
 
-#ALL_POSSIBLE_FEATURES:'open','high','low','close','volume','SMA7','SMA14','EMA7','EMA14','RSI','CCI','MACD','stoc_k','stoc_d','MACD_signal_line,'polarity'
+#ALL_POSSIBLE_FEATURES:'open','high','low','close','volume','SMA7','SMA14','EMA7','EMA14','RSI','CCI','MACD','stoc_k','stoc_d','MACD_signal_line','ATR','polarity'
 
 #Features impostate per il training
 train_test_nextpred_features=['open','high','low','close','volume']
@@ -313,6 +313,14 @@ plt.tight_layout()
 plt.show()
 
 
+#Predizione sugli ultimi tot giorni di validazione
+tot_giorni=5
+last_tot_real_data = Y_test[-tot_giorni:]
+last_tot_pred_data = Y_pred_test[-tot_giorni:]
 
 
+#Calcolo MSE per tot giorni
+print("MSE tot test: %f" % mean_squared_error(last_tot_real_data, last_tot_pred_data))
 
+#Calcolo MAPE per tot giorni
+print("MAPE tot test: %f" % (mean_absolute_percentage_error(last_tot_real_data, last_tot_pred_data)*100))
