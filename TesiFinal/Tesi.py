@@ -6,6 +6,7 @@ import technical_indicators_lib as til
 from sklearn.ensemble import AdaBoostRegressor
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 from datetime import datetime,timedelta,timezone
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error,mean_absolute_percentage_error, mean_squared_log_error, median_absolute_error, explained_variance_score
@@ -183,17 +184,25 @@ normalized_data=normalized_data.dropna()
 # Ordina il DataFrame in base alle date
 normalized_data.sort_values(by='Date', inplace=True)
 
+X=normalized_data[train_test_nextpred_features]
+y=normalized_data['Next_Close']
+
 # Calcola l'indice per dividere i dati
-split_index = int(0.7 * len(data))\
+split_index = int(0.7 * len(data))
 
 # Dividi i dati in set di addestramento e test
 train_data = normalized_data[:split_index]
-test_data = normalized_data[split_index:]
+split_new = int(0.66 * len(normalized_data[split_index:]))
+test_data = (normalized_data[split_index:])[:split_new]
+new_data = (normalized_data[split_index:])[split_new:]
 
 X_train = train_data[train_test_nextpred_features].values
 Y_train = train_data['Next_Close'].values
 X_test = test_data[train_test_nextpred_features].values
 Y_test = test_data['Next_Close'].values
+X_new = new_data[train_test_nextpred_features].values
+Y_new = new_data['Next_Close'].values
+
 
 #Applico il regressore AdaBoost
 ada = AdaBoostRegressor(DecisionTreeRegressor(max_depth=2), n_estimators=100, learning_rate=1, random_state=42)
@@ -313,10 +322,20 @@ plt.tight_layout()
 plt.show()
 
 
+#previsione su dati mai visti
+Y_pred_new = ada.predict(X_new)
+
+#Calcolo MSE
+print("MSE new test: %f" % mean_squared_error(Y_new, Y_pred_new))
+#Calcolo MAPE
+print("MAPE new test: %f" % (mean_absolute_percentage_error(Y_new, Y_pred_new)*100))
+
+'''
 #Predizione sugli ultimi tot giorni di validazione
-tot_giorni=5
-last_tot_real_data = Y_test[-tot_giorni:]
-last_tot_pred_data = Y_pred_test[-tot_giorni:]
+tot_giorni_start=60
+tot_giorni_end=6
+last_tot_real_data = Y_test[-tot_giorni_start:-tot_giorni_end]
+last_tot_pred_data = Y_pred_test[-tot_giorni_start:-tot_giorni_end]
 
 
 #Calcolo MSE per tot giorni
@@ -324,3 +343,4 @@ print("MSE tot test: %f" % mean_squared_error(last_tot_real_data, last_tot_pred_
 
 #Calcolo MAPE per tot giorni
 print("MAPE tot test: %f" % (mean_absolute_percentage_error(last_tot_real_data, last_tot_pred_data)*100))
+'''
