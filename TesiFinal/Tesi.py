@@ -3,6 +3,7 @@ import yfinance as yf
 import numpy as np
 import Sentiment
 import technical_indicators_lib as til
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.ensemble import AdaBoostRegressor
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.model_selection import cross_val_score
@@ -11,6 +12,9 @@ import matplotlib.pyplot as plt
 from datetime import datetime,timedelta,timezone
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error,mean_absolute_percentage_error, mean_squared_log_error, median_absolute_error, explained_variance_score
 
+
+
+'''
 #Definisco il Normalizzatore
 class Normalizer():
     # una gaussiana ha 2 parametri: mu (indica la media, il centro, x del picco) e la variazione std
@@ -30,7 +34,7 @@ class Normalizer():
     
     def inverse_transform_lin(self, x):
         return (x*self.sd.iloc[0]) + self.mu.iloc[0]
-
+'''
 #Funzione per convertire array di timestamps in float con fuso orario italiano    
 def timestamps_to_floats(timestamps):
 
@@ -157,11 +161,16 @@ data.to_csv(percorso_file_csv, index=False)
 #ALL_POSSIBLE_FEATURES:'open','high','low','close','volume','SMA7','SMA14','EMA7','EMA14','RSI','CCI','MACD','stoc_k','stoc_d','MACD_signal_line','ATR','polarity'
 
 #Features impostate per il training
-train_test_nextpred_features=['open','high','low','close','volume']
+train_test_nextpred_features=['open','high','low','close','volume','RSI']
 
 # Calcola il prezzo di chiusura del giorno successivo e aggiungi come target
 data['Next_Close']=data['close'].shift(-1)
 
+# Ordina il DataFrame in base alle date
+data.sort_values(by='Date', inplace=True)
+
+
+'''
 #Applico la normalizzazione
 normalizer=Normalizer()
 columns_to_normalize = data[train_test_nextpred_features]
@@ -177,60 +186,81 @@ for column in data.columns:
 
 #Ultima riga per predizione giorno successivo
 latest_data = normalized_data.iloc[-1][train_test_nextpred_features].values.reshape(1, -1)
+'''
 
-# Rimuovi le righe con valori mancanti
-normalized_data=normalized_data.dropna()
 
-# Ordina il DataFrame in base alle date
-normalized_data.sort_values(by='Date', inplace=True)
+data=data.dropna()
 
-X=normalized_data[train_test_nextpred_features]
-y=normalized_data['Next_Close']
+X_notnormalize=data[train_test_nextpred_features]
+y_notnormalize=data['Next_Close']
+
+#Normalizzazione
+ss = StandardScaler()
+mm = MinMaxScaler()
+X_trans = ss.fit_transform(X_notnormalize)
+y_trans =mm.fit_transform(y_notnormalize.values.reshape(-1,1))
 
 # Calcola l'indice per dividere i dati
 split_index = int(0.7 * len(data))
 
-# Dividi i dati in set di addestramento e test
-train_data = normalized_data[:split_index]
-split_new = int(0.66 * len(normalized_data[split_index:]))
-test_data = (normalized_data[split_index:])[:split_new]
-new_data = (normalized_data[split_index:])[split_new:]
+# Dividi i dati in set di addestramento, test e new
+X_train = X_trans[:split_index]
+Y_train_norm = y_trans[:split_index]
 
-X_train = train_data[train_test_nextpred_features].values
-Y_train = train_data['Next_Close'].values
-X_test = test_data[train_test_nextpred_features].values
-Y_test = test_data['Next_Close'].values
-X_new = new_data[train_test_nextpred_features].values
-Y_new = new_data['Next_Close'].values
+split_new = int(0.66 * len(data[split_index:]))
 
+X_test = (X_trans[split_index:])[:split_new]
+Y_test_norm = (y_trans[split_index:])[:split_new]
+
+X_new = (X_trans[split_index:])[split_new:]
+Y_new_norm = (y_trans[split_index:])[split_new:]
 
 #Applico il regressore AdaBoost
 ada = AdaBoostRegressor(DecisionTreeRegressor(max_depth=2), n_estimators=100, learning_rate=1, random_state=42)
-ada.fit(X_train, Y_train)
-Y_pred_train = ada.predict(X_train)
-Y_pred_test = ada.predict(X_test)
+ada.fit(X_train, Y_train_norm)
+Y_pred_train_norm = ada.predict(X_train)
+Y_pred_test_norm = ada.predict(X_test)
+
+#Previsione su dati mai visti
+Y_pred_new_norm = ada.predict(X_new)
+
+#Denormalizzo
+Y_train = mm.inverse_transform(Y_train_norm.reshape(-1,1))
+Y_pred_train = mm.inverse_transform(Y_pred_train_norm.reshape(-1,1))
+Y_test = mm.inverse_transform(Y_test_norm.reshape(-1,1))
+Y_pred_test = mm.inverse_transform(Y_pred_test_norm.reshape(-1,1))
+Y_new = mm.inverse_transform(Y_new_norm.reshape(-1,1))
+Y_pred_new = mm.inverse_transform(Y_pred_new_norm.reshape(-1,1))
+
 
 #Metriche di valutazione
 
 #Calcolo Cross Validation
+#Calcolo MSE
+print("MSE train: %f" % mean_squared_error(Y_train, Y_pred_train))
+print("MSE test: %f" % mean_squared_error(Y_test, Y_pred_test))
+#Calcolo MAPE
+print("MAPE train: %f" % (mean_absolute_percentage_error(Y_train, Y_pred_train)*100))
+print("MAPE test: %f" % (mean_absolute_percentage_error(Y_test, Y_pred_test)*100))
+#Calcolo MSE new
+print("MSE new test: %f" % mean_squared_error(Y_new, Y_pred_new))
+#Calcolo MAPE new
+print("MAPE new test: %f" % (mean_absolute_percentage_error(Y_new, Y_pred_new)*100))
+'''
 scores = cross_val_score(ada, X_train, Y_train, cv=5, scoring='neg_mean_squared_error')
 mean_mse_train = -scores.mean()
 scores = cross_val_score(ada, X_test, Y_test, cv=5, scoring='neg_mean_squared_error')
 mean_mse_test = -scores.mean()
 print ("CV MSE train: ", mean_mse_train)
 print ("CV MSE test: ", mean_mse_test)
-#Calcolo MSE
-print("MSE train: %f" % mean_squared_error(Y_train, Y_pred_train))
-print("MSE test: %f" % mean_squared_error(Y_test, Y_pred_test))
+
 #Calcolo R2
 print("R2 train: %f" % r2_score(Y_train, Y_pred_train))
 print("R2 test: %f" % r2_score(Y_test, Y_pred_test))
 #Calcolo MAE
 print("MAE train: %f" % mean_absolute_error(Y_train, Y_pred_train))
 print("MAE test: %f" % mean_absolute_error(Y_test, Y_pred_test))
-#Calcolo MAPE
-print("MAPE train: %f" % (mean_absolute_percentage_error(Y_train, Y_pred_train)*100))
-print("MAPE test: %f" % (mean_absolute_percentage_error(Y_test, Y_pred_test)*100))
+
 #Calcolo MSLE
 print("MSLE train: %f" % mean_squared_log_error(Y_train, Y_pred_train))
 print("MSLE test: %f" % mean_squared_log_error(Y_test, Y_pred_test))
@@ -245,11 +275,11 @@ R2adj_train = 1 - (1-ada.score(X_train, Y_train))*(len(Y_train)-1)/(len(Y_train)
 R2adj_test = 1 - (1-ada.score(X_test, Y_test))*(len(Y_test)-1)/(len(Y_test)-X_test.shape[1]-1)
 print("R2adj train: ",R2adj_train)
 print("R2adj test: ",R2adj_test)
-
+'''
 # Estrai le date dalle colonne
-dates_train = train_data['Date'].values
+dates_train = data['Date'][:split_index].values
 dates_train_shifted=add_next_dates(dates_train[1:])
-dates_test = test_data['Date'].values
+dates_test = (data['Date'][split_index:])[:split_new].values
 dates_test_shifted=add_next_dates(dates_test[1:])
 
 #Numero di periodi di divisione della griglia
