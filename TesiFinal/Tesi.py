@@ -80,27 +80,13 @@ def apply_rolling_mean(data, column, window_size):
     return data
 
 
-sentiment = 0
+sentiment = 1
 initial_price_plot = 0
 
 # Carica i dati tramite api yfinance
-TITMI = yf.Ticker("TIT.MI")
+TITMI = yf.Ticker("MONC.MI")
 data= TITMI.history(period="1Y",actions=False) 
 data_sent=data
-
-#Sentiment
-if sentiment == 1:
-    print(data_sent.index[0])
-    print(data_sent.index[-1])
-    SA = Sentiment.Sentiment_Analysis(query="Telecom", language='it' ,country='IT', start=data_sent.index[0], end=data_sent.index[-1])
-    polarity_array = np.array('')
-    for idx in data_sent.index:
-        print(idx)
-        polarity_array = np.append(polarity_array, SA.do_Analysis(idx, debug=True))    
-    
-    data['polarity'] = polarity_array[:-1] # probabilmente va anche fatto un flip
-    plt.plot(polarity_array)
-    plt.show()
 
 #Reset dell'indice
 data.reset_index(inplace=True)
@@ -161,7 +147,7 @@ data.to_csv(percorso_file_csv, index=False)
 #ALL_POSSIBLE_FEATURES:'open','high','low','close','volume','SMA7','SMA14','EMA7','EMA14','RSI','CCI','MACD','stoc_k','stoc_d','MACD_signal_line','ATR','polarity'
 
 #Features impostate per il training
-train_test_nextpred_features=['open','high','low','close','volume','RSI']
+train_test_nextpred_features=['open','high','low','close','volume']
 
 # Calcola il prezzo di chiusura del giorno successivo e aggiungi come target
 data['Next_Close']=data['close'].shift(-1)
@@ -169,28 +155,10 @@ data['Next_Close']=data['close'].shift(-1)
 # Ordina il DataFrame in base alle date
 data.sort_values(by='Date', inplace=True)
 
-
-'''
-#Applico la normalizzazione
-normalizer=Normalizer()
-columns_to_normalize = data[train_test_nextpred_features]
-data_to_normalize = normalizer.fit_transform(columns_to_normalize)
-
-# Crea un DataFrame con i dati normalizzati
-normalized_data = pd.DataFrame(data_to_normalize, columns=train_test_nextpred_features)
-
-# Unisce il DataFrame normalizzato con le colonne non normalizzate
-for column in data.columns:
-    if column not in train_test_nextpred_features:
-        normalized_data[column] = data[column]
-
-#Ultima riga per predizione giorno successivo
-latest_data = normalized_data.iloc[-1][train_test_nextpred_features].values.reshape(1, -1)
-'''
-
-
+#Elimino tuple con null
 data=data.dropna()
 
+#Split in X e y
 X_notnormalize=data[train_test_nextpred_features]
 y_notnormalize=data['Next_Close']
 
@@ -232,15 +200,29 @@ Y_pred_test = mm.inverse_transform(Y_pred_test_norm.reshape(-1,1))
 Y_new = mm.inverse_transform(Y_new_norm.reshape(-1,1))
 Y_pred_new = mm.inverse_transform(Y_pred_new_norm.reshape(-1,1))
 
+#Sentiment
+if sentiment == 1:
+    for i in range(new_cutoff-5):
+        idx1 = new_cutoff - i
+        idx2 = idx1 + 5
+        # print("data: ",data.index[-idx1], " - ", data.index[-idx2])
+        Sent = mySentiment.Sentiment_Analysis(query=query,
+                                              start=data.index[-idx2], 
+                                              end=data.index[-idx1])
+        s_a = Sent.do_Analysis(True)
+        data_sa = np.zeros((new_cutoff-5,2))
+        data_sa[i][0] = test_predict[i+5]
+        data_sa[i][1] = s_a
+    print(data_sa)
 
 #Metriche di valutazione
 
 #Calcolo Cross Validation
 #Calcolo MSE
-print("MSE train: %f" % mean_squared_error(Y_train, Y_pred_train))
+#print("MSE train: %f" % mean_squared_error(Y_train, Y_pred_train))
 print("MSE test: %f" % mean_squared_error(Y_test, Y_pred_test))
 #Calcolo MAPE
-print("MAPE train: %f" % (mean_absolute_percentage_error(Y_train, Y_pred_train)*100))
+#print("MAPE train: %f" % (mean_absolute_percentage_error(Y_train, Y_pred_train)*100))
 print("MAPE test: %f" % (mean_absolute_percentage_error(Y_test, Y_pred_test)*100))
 #Calcolo MSE new
 print("MSE new test: %f" % mean_squared_error(Y_new, Y_pred_new))
@@ -276,6 +258,7 @@ R2adj_test = 1 - (1-ada.score(X_test, Y_test))*(len(Y_test)-1)/(len(Y_test)-X_te
 print("R2adj train: ",R2adj_train)
 print("R2adj test: ",R2adj_test)
 '''
+
 # Estrai le date dalle colonne
 dates_train = data['Date'][:split_index].values
 dates_train_shifted=add_next_dates(dates_train[1:])
