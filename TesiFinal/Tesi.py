@@ -219,22 +219,29 @@ data_sent.set_index('Date', inplace=True)
 
 #Sentiment
 if sentiment == 1:
-    data_sa = np.zeros((new_cutoff-5,2))
-    for i in range(new_cutoff-5):
+    data_sa = np.zeros((new_cutoff,2))
+    Sent = Sentiment.Sentiment_Analysis()
+    for i in range(new_cutoff):
         idx1 = new_cutoff - i
         idx2 = idx1 + 5
-        # print("data: ",data.index[-idx1], " - ", data.index[-idx2])
-        Sent = Sentiment.Sentiment_Analysis(query=query,
-                                              start=data_sent.index[-idx2], 
-                                              end=data_sent.index[-idx1])
-        s_a = Sent.do_Analysis(True)        
-        data_sa[i][0] = Y_pred_new[i+5]
+        s_a = Sent.do_Analysis(query=query, start=data_sent.index[-idx2], 
+                                            end=data_sent.index[-idx1],
+                                            debug=True)
+        # print("media: ", s_a)
+        data_sa[i][0] = Y_pred_new[i]
         data_sa[i][1] = s_a
     print(data_sa)
+    sa_pred = np.zeros(new_cutoff)
+    for i in range(new_cutoff):
+        sa_pred[i] = 3.0/100 * data_sa[i][0] * data_sa[i][1] + data_sa[i][0]
 
-#Metriche di valutazione
+    #metriche con sentiment
+    print("MSE new sent: %f" % mean_squared_error(Y_new, sa_pred))
+    print("MAPE new sent: %f" % (mean_absolute_percentage_error(Y_new, sa_pred)*100))
 
-#Calcolo Cross Validation
+
+#Metriche di valutazione gen
+
 #Calcolo MSE
 #print("MSE train: %f" % mean_squared_error(Y_train, Y_pred_train))
 print("MSE test: %f" % mean_squared_error(Y_test, Y_pred_test))
