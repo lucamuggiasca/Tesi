@@ -46,6 +46,14 @@ def timestamps_to_floats(timestamps):
 
     return np.array(float_array)
 
+#To datetime
+def converti_stringa_a_datetime(dataframe, nome_colonna):
+    if nome_colonna not in dataframe.columns:
+        raise ValueError(f"La colonna {nome_colonna} non esiste nel DataFrame.")
+    dataframe[nome_colonna] = pd.to_datetime(dataframe[nome_colonna], format='%Y-%m-%d', errors='coerce')
+
+    return dataframe
+
 #Funzione per convertire array di float in datestamp con fuso orario italiano 
 def float_to_date(float_dates):
     # Imposta il fuso orario desiderato(UTC+2)
@@ -53,9 +61,9 @@ def float_to_date(float_dates):
     # Converti i float in oggetti datetime con il fuso orario specificato
     date_objects = [datetime.fromtimestamp(ts, tz=tz) for ts in float_dates]
     # Formatta le date come stringhe nel formato 'Y-M-D'
-    date_strings = [dt.strftime('%Y-%m-%d') for dt in date_objects]
+    #date_strings = [dt.strftime('%Y-%m-%d') for dt in date_objects]
 
-    return date_strings
+    return date_objects
 
 #Funzione per aggiungere la data successiva al grafico
 def add_next_dates(date_array):
@@ -82,14 +90,16 @@ def apply_rolling_mean(data, column, window_size):
 
 sentiment = 1
 initial_price_plot = 0
+query ='Telecom Italia'
+titolo = "TIT.MI"
 
 # Carica i dati tramite api yfinance
-TITMI = yf.Ticker("MONC.MI")
+TITMI = yf.Ticker(titolo)
 data= TITMI.history(period="1Y",actions=False) 
 data_sent=data
-
 #Reset dell'indice
 data.reset_index(inplace=True)
+
 
 # Converti le colonne da stringa a float
 data['Date'] = timestamps_to_floats(data['Date']) 
@@ -200,18 +210,25 @@ Y_pred_test = mm.inverse_transform(Y_pred_test_norm.reshape(-1,1))
 Y_new = mm.inverse_transform(Y_new_norm.reshape(-1,1))
 Y_pred_new = mm.inverse_transform(Y_pred_new_norm.reshape(-1,1))
 
+#Lunghezza dati new
+new_cutoff = len(Y_pred_new)
+
+
+data_sent['Date'] = float_to_date(data_sent['Date'])
+data_sent.set_index('Date', inplace=True)
+
 #Sentiment
 if sentiment == 1:
+    data_sa = np.zeros((new_cutoff-5,2))
     for i in range(new_cutoff-5):
         idx1 = new_cutoff - i
         idx2 = idx1 + 5
         # print("data: ",data.index[-idx1], " - ", data.index[-idx2])
-        Sent = mySentiment.Sentiment_Analysis(query=query,
-                                              start=data.index[-idx2], 
-                                              end=data.index[-idx1])
-        s_a = Sent.do_Analysis(True)
-        data_sa = np.zeros((new_cutoff-5,2))
-        data_sa[i][0] = test_predict[i+5]
+        Sent = Sentiment.Sentiment_Analysis(query=query,
+                                              start=data_sent.index[-idx2], 
+                                              end=data_sent.index[-idx1])
+        s_a = Sent.do_Analysis(True)        
+        data_sa[i][0] = Y_pred_new[i+5]
         data_sa[i][1] = s_a
     print(data_sa)
 
