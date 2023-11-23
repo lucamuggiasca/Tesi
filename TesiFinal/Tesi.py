@@ -85,7 +85,7 @@ def add_next_dates(date_array):
 def apply_rolling_mean(data, column, window_size):
     data[column] = data[column].rolling(window=window_size).mean()
     data = data.dropna()  # Rimuovi i valori mancanti generati dalla media mobile
-    return data
+    return data 
 
 
 sentiment = 1
@@ -230,7 +230,7 @@ if sentiment == 1:
         # print("media: ", s_a)
         data_sa[i][0] = Y_pred_new[i]
         data_sa[i][1] = s_a
-    print(data_sa)
+    #print(data_sa)
     sa_pred = np.zeros(new_cutoff)
     for i in range(new_cutoff):
         sa_pred[i] = 3.0/100 * data_sa[i][0] * data_sa[i][1] + data_sa[i][0]
